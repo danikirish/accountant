@@ -3,35 +3,264 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => BudgetModel(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  // const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => MyAppState(),
-      child: MaterialApp(
+    // ================ OLD ==================
+    // return ChangeNotifierProvider(
+    //   create: (context) => MyAppState(),
+    //   child: MaterialApp(
+    // title: 'Accountant',
+    // theme: ThemeData(
+    //   useMaterial3: true,
+    //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+    // ),
+    //     home: MyHomePage(),
+    //     // home: BudgetPage(),
+    //   ),
+    // );
+    // ================ OLD ==================
+
+    return MaterialApp(
         title: 'Accountant',
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         ),
-        home: MyHomePage(),
+        home: BudgetPage());
+  }
+}
+
+class BudgetModel extends ChangeNotifier {
+  double _initialBudget = 0;
+  double _currentBudget = 0;
+  double _spent = 0;
+  bool showValueInput = false;
+  // bool showTextInput = false;
+
+  double getCurrentBudget() {
+    return _currentBudget;
+  }
+
+  double getInitialBudget() {
+    return _initialBudget;
+  }
+
+  double getSpent() {
+    return _spent;
+  }
+
+  double getRemaining() {
+    return _initialBudget - _spent;
+  }
+
+  void setCurrentBudget(double value, bool notify) {
+    _currentBudget = value;
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void setInitialBudget(double value) {
+    _initialBudget = value;
+    setCurrentBudget(_initialBudget, false);
+    notifyListeners();
+  }
+
+  void addTransaction(double value) {
+    _spent += value;
+    _currentBudget -= value;
+    toggleValueInput();
+    notifyListeners();
+  }
+
+  void subtractTransaction(double value) {
+    _spent -= value;
+    _currentBudget += value;
+    notifyListeners();
+  }
+
+  void toggleValueInput() {
+    showValueInput = !showValueInput;
+    print(showValueInput);
+    notifyListeners();
+  }
+
+  void resetAll() {
+    _currentBudget = 0;
+    _initialBudget = 0;
+    _spent = 0;
+    showValueInput = false;
+    notifyListeners();
+  }
+}
+
+class BudgetPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final budgetModel = context.watch<BudgetModel>();
+    final theme = Theme.of(context);
+
+    return Scaffold(
+        // color: Theme.of(context).colorScheme.primaryContainer,
+        body: SingleChildScrollView(
+            child: Center(
+                child: Container(
+      padding: EdgeInsets.all(16.0),
+      constraints: BoxConstraints(
+        maxHeight:
+            MediaQuery.of(context).size.height * 0.8, // 80% of screen height
       ),
+      child: Material(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (budgetModel.getCurrentBudget() < 0) Text('Oops...'),
+            BigCard(value: budgetModel.getCurrentBudget()),
+            SizedBox(height: 20),
+            StatLine(
+                label: 'Initial budget: ',
+                value: budgetModel.getInitialBudget()),
+            StatLine(label: 'Spent so far: ', value: budgetModel.getSpent()),
+            budgetModel.showValueInput
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(hintText: "Enter amount"),
+                          onSubmitted: (value) =>
+                              budgetModel.addTransaction(double.parse(value)),
+                          // budgetModel.addTransaction(100),
+                          autofocus: true,
+                          onTapOutside: (event) =>
+                              budgetModel.toggleValueInput(),
+                          textInputAction: TextInputAction.go,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                        SizedBox(height: 150),
+                        // ElevatedButton.icon(
+                        //     onPressed: () {
+                        //       // budgetModel.addTransaction(100);
+                        //       budgetModel.toggleValueInput();
+                        //     },
+                        //     icon: Icon(Icons.remove_circle, size: 10),
+                        //     label: Text('Add 100',
+                        //         style: TextStyle(fontSize: 20))),
+                        IconButton(
+                          onPressed: () {
+                            budgetModel.toggleValueInput();
+                          },
+                          icon: Icon(Icons.remove_circle),
+                          iconSize: 100,
+                          color: theme.colorScheme.primary,
+                        ),
+                        SizedBox(width: 20),
+                        IconButton(
+                            onPressed: () {
+                              budgetModel.subtractTransaction(100);
+                            },
+                            iconSize: 40,
+                            color: theme.colorScheme.secondary,
+                            icon: Icon(Icons.add_circle)),
+                        // ===============================================
+                        // IconButton(
+                        //   onPressed: () {
+                        //     budgetModel.addTransaction(100);
+                        //   },
+                        //   icon: Icon(Icons.add_circle),
+                        //   iconSize: 100,
+                        //   color: theme.colorScheme.primary,
+                        // ),
+                        //   onPressed: () {
+                        //     budgetModel.subtractTransaction(100);
+                        //   },
+                        // ElevatedButton.icon(
+                        //     onPressed: () {
+                        //       budgetModel.addTransaction(100);
+                        //     },
+                        //     icon: Icon(plusIcon),
+                        //     label: Text('Add 100')),
+                        // ElevatedButton.icon(
+                        //   onPressed: () {
+                        //     budgetModel.subtractTransaction(100);
+                        //   },
+                        //   icon: Icon(minusIcon),
+                        //   label: Text('Subtract hundred'),
+                        // )
+                      ]),
+            IconButton(
+                onPressed: () => {budgetModel.resetAll()},
+                icon: Icon(Icons.replay_outlined))
+          ],
+        ),
+      ),
+    ))));
+  }
+}
+
+class StatLine extends StatelessWidget {
+  const StatLine({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.displaySmall!.copyWith(
+      color: theme.colorScheme.onPrimary,
+      // backgroundColor: Colors.,
     );
+    final valueStyle = theme.textTheme.displaySmall!.copyWith(
+      color: theme.colorScheme.onPrimary,
+      backgroundColor: theme.cardColor,
+    );
+
+    return Row(
+        spacing: 8.0,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Card(child: Text(label)),
+          Card(
+              color: valueStyle.backgroundColor,
+              child: Text('${label} ${value.toStringAsPrecision(2)}')),
+        ]);
   }
 }
 
 class MyAppState extends ChangeNotifier {
-  var current = WordPair.random();
+  // ======= OLD ===============
+  var currentWord = WordPair.random();
 
   var favorites = <WordPair>[];
 
   void getNext() {
-    current = WordPair.random();
+    currentWord = WordPair.random();
     notifyListeners();
   }
 
@@ -41,13 +270,20 @@ class MyAppState extends ChangeNotifier {
   }
 
   void toggleFavorite() {
-    if (favorites.contains(current)) {
-      favorites.remove(current);
+    if (favorites.contains(currentWord)) {
+      favorites.remove(currentWord);
     } else {
-      favorites.add(current);
+      favorites.add(currentWord);
     }
     notifyListeners();
   }
+  // ======= OLD ===============
+
+  var budget;
+  var current;
+  var spent;
+  var earned;
+  var records = [];
 }
 
 class MyHomePage extends StatefulWidget {
@@ -66,54 +302,12 @@ class _MyHomePageState extends State<MyHomePage> {
         page = GeneratorPage();
         break;
       case 1:
-        // page = Placeholder();
-        page = FavoritesPage();
+        page = Placeholder();
+        // page = FavoritesPage();
         break;
       default:
         throw UnimplementedError('no widget for $selectedIndex');
     }
-
-// ===================== NavigationRail Version ===================
-//     return LayoutBuilder(builder: (context, constraints) {
-//       return Scaffold(
-//         body: Row(
-//           children: [
-//             SafeArea(
-//               child: NavigationRail(
-//                 backgroundColor:
-//                     Theme.of(context).colorScheme.surfaceContainerLow,
-//                 extended: constraints.maxWidth >= 600,
-//                 destinations: [
-//                   NavigationRailDestination(
-//                     icon: Icon(Icons.home),
-//                     label: Text('Home'),
-//                   ),
-//                   NavigationRailDestination(
-//                     icon: Icon(Icons.favorite),
-//                     label: Text('Favorites'),
-//                   ),
-//                 ],
-//                 selectedIndex: selectedIndex,
-//                 onDestinationSelected: (value) {
-//                   setState(() {
-//                     selectedIndex = value;
-//                   });
-//                 },
-//               ),
-//             ),
-//             Expanded(
-//               child: Container(
-//                 color: Theme.of(context).colorScheme.primaryContainer,
-//                 child: page,
-//               ),
-//             ),
-//           ],
-//         ),
-//       );
-//     });
-//   }
-// }
-// ========================================
 
     return Scaffold(
       body: LayoutBuilder(builder: (context, constraints) {
@@ -158,11 +352,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+// =================== OLD =======================================
 class GeneratorPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
-    var pair = appState.current;
+    var pair = appState.currentWord;
     final theme = Theme.of(context);
 
     IconData icon;
@@ -178,7 +373,7 @@ class GeneratorPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            BigCard(pair: pair),
+            // BigCard(pair: pair),
             SizedBox(height: 20),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -247,10 +442,11 @@ class FavoritesPage extends StatelessWidget {
 class BigCard extends StatelessWidget {
   const BigCard({
     super.key,
-    required this.pair,
+    required this.value,
   });
 
-  final WordPair pair;
+  // final WordPair pair;
+  final double value;
 
   @override
   Widget build(BuildContext context) {
@@ -264,11 +460,12 @@ class BigCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Text(
-          pair.asPascalCase,
+          value.toStringAsFixed(2),
           style: style,
-          semanticsLabel: "${pair.first} ${pair.second}",
+          semanticsLabel: "${value.toStringAsFixed(2)}",
         ),
       ),
     );
   }
 }
+// =================== OLD =======================================
