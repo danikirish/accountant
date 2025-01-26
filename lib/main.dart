@@ -1,6 +1,7 @@
 import 'package:english_words/english_words.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(
@@ -64,16 +65,18 @@ class BudgetModel extends ChangeNotifier {
     return _initialBudget - _spent;
   }
 
-  void setCurrentBudget(double value, bool notify) {
+  bool isBudgetNotSet() {
+    return _initialBudget == 0;
+  }
+
+  void setCurrentBudget(double value) {
     _currentBudget = value;
-    if (notify) {
-      notifyListeners();
-    }
+    // notifyListeners();
   }
 
   void setInitialBudget(double value) {
     _initialBudget = value;
-    setCurrentBudget(_initialBudget, false);
+    setCurrentBudget(_initialBudget);
     notifyListeners();
   }
 
@@ -85,7 +88,7 @@ class BudgetModel extends ChangeNotifier {
   }
 
   void subtractTransaction(double value) {
-    _spent -= value;
+    // _spent -= value;
     _currentBudget += value;
     notifyListeners();
   }
@@ -106,6 +109,9 @@ class BudgetModel extends ChangeNotifier {
 }
 
 class BudgetPage extends StatelessWidget {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _controller = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     final budgetModel = context.watch<BudgetModel>();
@@ -127,12 +133,33 @@ class BudgetPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (budgetModel.getCurrentBudget() < 0) Text('Oops...'),
+            if (budgetModel.isBudgetNotSet())
+              Row(children: [
+                Text("Please set budget"),
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                      controller: _controller,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (value) {
+                        final parsedValue = double.tryParse(value);
+                        if (parsedValue == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Invalid budget value")),
+                          );
+                        } else {
+                          budgetModel.setInitialBudget(parsedValue);
+                          _controller.clear();
+                        }
+                      }),
+                )
+              ]),
             BigCard(value: budgetModel.getCurrentBudget()),
             SizedBox(height: 20),
             StatLine(
-                label: 'Initial budget: ',
-                value: budgetModel.getInitialBudget()),
-            StatLine(label: 'Spent so far: ', value: budgetModel.getSpent()),
+                label: 'Initial budget', value: budgetModel.getInitialBudget()),
+            StatLine(label: 'Spent so far', value: budgetModel.getSpent()),
             budgetModel.showValueInput
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -141,10 +168,44 @@ class BudgetPage extends StatelessWidget {
                       SizedBox(
                         width: 120,
                         child: TextField(
+                          controller: _controller,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(hintText: "Enter amount"),
-                          onSubmitted: (value) =>
-                              budgetModel.addTransaction(double.parse(value)),
+                          decoration: InputDecoration(
+                            hintText: "Enter amount",
+                            // border: OutlineInputBorder(),
+                            errorText: _controller.text.isEmpty
+                                ? null
+                                : (double.tryParse(_controller.text) == null
+                                    ? "Invalid number"
+                                    : null),
+                          ),
+                          onSubmitted: (value) {
+                            print("VAL: ${value}");
+                            var hasError = false;
+                            if (value.isNotEmpty) {
+                              final parsedValue = double.tryParse(value);
+                              if (parsedValue != null) {
+                                budgetModel.addTransaction(parsedValue);
+                                _controller.clear();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          "Transaction added: $parsedValue")),
+                                );
+                                // _controller.clear();
+                              } else {
+                                hasError = true;
+                              }
+                            } else {
+                              hasError = true;
+                            }
+                            if (hasError) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Invalid value")),
+                              );
+                              budgetModel.toggleValueInput();
+                            }
+                          },
                           // budgetModel.addTransaction(100),
                           autofocus: true,
                           onTapOutside: (event) =>
@@ -220,11 +281,7 @@ class BudgetPage extends StatelessWidget {
 }
 
 class StatLine extends StatelessWidget {
-  const StatLine({
-    super.key,
-    required this.label,
-    required this.value,
-  });
+  const StatLine({super.key, required this.label, required this.value});
 
   final String label;
   final double value;
@@ -232,24 +289,49 @@ class StatLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    var f = NumberFormat.currency(locale: "ja", symbol: "¥");
     final labelStyle = theme.textTheme.displaySmall!.copyWith(
-      color: theme.colorScheme.onPrimary,
+      // color: theme.colorScheme.onPrimary,
+      fontSize: 20,
+      fontWeight: FontWeight.w500,
+      color: theme.colorScheme.onSecondary,
       // backgroundColor: Colors.,
     );
-    final valueStyle = theme.textTheme.displaySmall!.copyWith(
-      color: theme.colorScheme.onPrimary,
-      backgroundColor: theme.cardColor,
-    );
+    // final valueStyle = theme.textTheme.displaySmall!.copyWith(
+    //   color: theme.colorScheme.onPrimary,
+    //   // backgroundColor: theme.cardColor,
+    //   fontWeight: FontWeight.bold,
+    // );
 
-    return Row(
-        spacing: 8.0,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Card(child: Text(label)),
-          Card(
-              color: valueStyle.backgroundColor,
-              child: Text('${label} ${value.toStringAsPrecision(2)}')),
-        ]);
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 8.0,
+            children: [
+              // Expanded(
+              SizedBox(width: 15),
+              Card(
+                color: theme.colorScheme.secondary,
+                child: Row(
+                  children: [
+                    SizedBox(width: 12),
+                    Text(
+                      '$label: ${f.format(value)}',
+                      style: labelStyle,
+                      textAlign: TextAlign.left,
+                    ),
+                    SizedBox(width: 40),
+                  ],
+                ),
+                // ),
+              ),
+            ]
+            //   Card(
+            //       color: valueStyle.backgroundColor,
+            //       child: Text('${label} ${value.toStringAsPrecision(2)}')),
+            // ]),
+            ));
   }
 }
 
@@ -450,6 +532,7 @@ class BigCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var f = NumberFormat.currency(locale: "ja", symbol: "¥");
     final theme = Theme.of(context);
     final style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
@@ -460,9 +543,10 @@ class BigCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Text(
-          value.toStringAsFixed(2),
+          f.format(value),
+          // "HELLO",
           style: style,
-          semanticsLabel: "${value.toStringAsFixed(2)}",
+          semanticsLabel: "${value.toStringAsFixed(0)}",
         ),
       ),
     );
